@@ -138,6 +138,7 @@ class DCGAN():
             noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
             gen_imgs = self.generator.predict(noise)
 
+            # 未来可以尝试一下，按照论文里说的，判别器多训练几次，比如10次。
             # Train the discriminator (real classified as ones and generated as zeros)
             d_loss_real = self.discriminator.train_on_batch(imgs, valid)
             d_loss_fake = self.discriminator.train_on_batch(gen_imgs, fake)
@@ -146,6 +147,8 @@ class DCGAN():
             # ---------------------
             #  Train Generator
             # ---------------------
+
+
 
             # Train the generator (wants discriminator to mistake images as real)
             g_loss = self.combined.train_on_batch(noise, valid)
@@ -198,10 +201,11 @@ class DCGAN():
                 cnt += 1
         fig.savefig("images/mnist_%d.png" % epoch)
         plt.close()
+
     def loadModel(self):
         self.combined = load_model('./model/combined_model_last.h5')
         self.discriminator = load_model('./model/discriminator_model_last.h5')
-        
+
 if __name__ == '__main__':
     dcgan = DCGAN()
     dcgan.train(epochs=40000, batch_size=64, save_interval=800)
