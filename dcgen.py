@@ -29,12 +29,11 @@ class DCGAN():
 
         #对判别器进行构建和编译
         self.discriminator = self.build_discriminator()
-        print("0")
+        print("构建了D")
         self.discriminator.compile(loss='binary_crossentropy',optimizer=optimizer,metrics=['accuracy'])
-        print("1")
         #对生成器进行构造
         self.generator = self.build_generator()
-        print("2")
+        print("构建了G")
         # The generator takes noise as input and generates imgs
         z = Input(shape=(self.latent_dim,))
         img = self.generator(z)
@@ -132,7 +131,7 @@ class DCGAN():
             # Select a random half of images
             # idx = np.random.randint(0, X_train.shape[0], batch_size)
             # imgs = X_train[idx]
-            imgs = self.load_batch_imgs(batch_size,'faces')
+            imgs = self.load_batch_imgs(batch_size,'data/faces')
 
             # Sample noise and generate a batch of new images
             noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
@@ -147,8 +146,6 @@ class DCGAN():
             # ---------------------
             #  Train Generator
             # ---------------------
-
-
 
             # Train the generator (wants discriminator to mistake images as real)
             g_loss = self.combined.train_on_batch(noise, valid)
@@ -199,7 +196,7 @@ class DCGAN():
                 axs[i,j].imshow(gen_imgs[cnt, :,:,:])
                 axs[i,j].axis('off')
                 cnt += 1
-        fig.savefig("images/mnist_%d.png" % epoch)
+        fig.savefig("data/gen/avatar_%d.png" % epoch)
         plt.close()
 
     def loadModel(self):
