@@ -186,9 +186,9 @@ class DCGAN():
 
         # Rescale images 0 - 1
         #gen_imgs = 0.5 * gen_imgs + 0.5
-        print(gen_imgs)
+        # print(gen_imgs)
         gen_imgs = (gen_imgs + 1)*127.5
-        print(gen_imgs)
+        # print(gen_imgs)
 
         fig, axs = plt.subplots(r, c)
         cnt = 0   #生成的25张图 显示出来
