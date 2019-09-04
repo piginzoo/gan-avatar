@@ -6,7 +6,7 @@ from keras.layers import LeakyReLU
 from keras.layers import UpSampling2D,Conv2D
 from keras.models import Sequential,Model
 from keras.optimizers import Adam,RMSprop
-
+import time
 from keras.models import load_model
 from keras.preprocessing import image
 import os
@@ -111,7 +111,7 @@ class DCGAN():
 
         return Model(img,validity)
 
-    def train(self,epochs,batch_size=128,save_interval = 1000,d_loop=5,g_loop=1,debug=False):
+    def train(self,epochs,batch_size=64,save_interval = 800,d_loop=5,g_loop=1,debug=False):
         if (debug):
             print("调试模式，调整参数")
             batch_size = 3
@@ -120,15 +120,20 @@ class DCGAN():
         # Adversarial ground truths
         valid = np.ones((batch_size, 1))
         fake = np.zeros((batch_size, 1))
+        dir_name = 'data/faces'
+        img_names = os.listdir(os.path.join(dir_name))
+        img_names = np.array(img_names)
+
         for epoch in range(epochs):
 
+            start = time.time()
             # ---------------------
             #  Train Discriminator
             # ---------------------
             d_loss_sum = 0
+            # 按照论文里说的，判别器多训练几次，比如5次。
             for i in range(d_loop):
-                # 未来可以尝试一下，按照论文里说的，判别器多训练几次，比如10次。
-                imgs = self.load_batch_imgs(batch_size,'data/faces')
+                imgs = self.load_batch_imgs(batch_size,img_names,dir_name)
                 d_loss_real = self.discriminator.train_on_batch(imgs, valid)
 
                 noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
@@ -147,7 +152,7 @@ class DCGAN():
             g_loss = self.combined.train_on_batch(noise, valid)
 
             # Plot the progress
-            print ("%d [D loss: %f, acc.: %.2f%%] [G loss: %f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss))
+            print ("%d | D loss: %f | Acc.: %.2f%% | G loss: %f | Time: %f" % (epoch, d_loss[0], 100*d_loss[1], g_loss, time.time()-start))
 
             # If at save interval => save generated image samples
             if epoch % save_interval == 0:
@@ -156,9 +161,7 @@ class DCGAN():
                 self.save_imgs(epoch)
 
 
-    def load_batch_imgs(self,batch_size,dirName):
-        img_names = os.listdir(os.path.join(dirName))
-        img_names = np.array(img_names)
+    def load_batch_imgs(self,batch_size,img_names,dirName):
         idx = np.random.randint(0, img_names.shape[0], batch_size)
         img_names = img_names[idx]
         img = []
@@ -181,12 +184,7 @@ class DCGAN():
         r, c = 5, 5
         noise = np.random.normal(0, 1, (r * c, self.latent_dim))  #高斯分布，均值0，标准差1，size= (5*5, 100)
         gen_imgs = self.generator.predict(noise)
-
-        # Rescale images 0 - 1
-        #gen_imgs = 0.5 * gen_imgs + 0.5
-        # print(gen_imgs)
         gen_imgs = (gen_imgs + 1)*127.5
-        # print(gen_imgs)
 
         fig, axs = plt.subplots(r, c)
         cnt = 0   #生成的25张图 显示出来
