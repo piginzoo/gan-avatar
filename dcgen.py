@@ -21,29 +21,39 @@ class DCGAN():
         self.img_shape=(self.img_rows,self.img_cols,self.channels)
         self.latent_dim =100
 
-        optimizer = Adam()#0.0002,0.5) <---- 用默认值来
-        optimizerD =RMSprop(lr=0.0008, clipvalue=1.0, decay=6e-8)
-        optimizerG = RMSprop(lr=0.0004, clipvalue=1.0, decay=6e-8)
-        print("-1")
+        optimizer = Adam(0.0002,0.5)
+        # optimizerD =RMSprop(lr=0.0008, clipvalue=1.0, decay=6e-8)
+        # optimizerG = RMSprop(lr=0.0004, clipvalue=1.0, decay=6e-8)
 
         #对判别器进行构建和编译
         self.discriminator = self.build_discriminator()
-        print("构建了D")
         self.discriminator.compile(loss='binary_crossentropy',optimizer=optimizer,metrics=['accuracy'])
+        print("构建了D")
+
         #对生成器进行构造
         self.generator = self.build_generator()
         print("构建了G")
         # The generator takes noise as input and generates imgs
         z = Input(shape=(self.latent_dim,))
-        img = self.generator(z)
-
+        gen_img = self.generator(z)
         # 总体模型只对生成器进行训练
-        self.discriminator.trainable = False
+        # 靠！可以这么写么？之前的模型self.discriminator不会收影响么？难道因为已经compile了么？表示怀疑？？？
+        # https://stackoverflow.com/questions/45154180/how-to-dynamically-freeze-weights-after-compiling-model-in-keras
+        # https://github.com/keras-team/keras/blob/master/examples/mnist_acgan.py
+        self.discriminator.trainable = False 
 
         # 从生成器中生成的图 经过判别器获得一个valid
-        valid = self.discriminator(img)
+        valid = self.discriminator(gen_img)
+
+        # model = Model(inputs=[a1, a2], outputs=[b1, b3, b3])
         self.combined = Model(z,valid)
         self.combined.compile(loss='binary_crossentropy', optimizer=optimizer)
+
+        print("################生成器+判别器结构################")
+        self.combined.summary()
+
+        print("################判别器结构################")
+        self.discriminator.summary()
 
     # G
     def build_generator(self):
@@ -71,6 +81,7 @@ class DCGAN():
         model.add(Conv2D(self.channels, kernel_size=5, padding="same"))
         model.add(Activation("tanh"))
 
+        print("生成G结构")
         model.summary()  #打印网络参数
 
         noise = Input(shape=(self.latent_dim,))
@@ -104,12 +115,18 @@ class DCGAN():
         model.add(Flatten())
         model.add(Dense(1, activation='sigmoid'))
 
+        print("判别器D结构")
         model.summary()
 
         img = Input(shape=self.img_shape)
         validity = model(img)
 
         return Model(img,validity)
+
+    def set_trainability(self,model, trainable=False):
+        model.trainable = trainable
+        for layer in model.layers:
+            layer.trainable = trainable        
 
     def train(self,epochs,batch_size=64,save_interval = 800,d_loop=5,g_loop=1,debug=False):
         if (debug):
