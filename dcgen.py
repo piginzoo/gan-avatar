@@ -13,7 +13,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
-debug = True
+DEBUG = True
 
 class DCGAN():
     def __init__(self):
@@ -45,7 +45,7 @@ class DCGAN():
         # 从生成器中生成的图 经过判别器获得一个valid
         valid = self.discriminator(img)
         self.combined = Model(z,valid)
-        self.combined.compile(loss='binary_crossentropy', optimizer=optiizer)
+        self.combined.compile(loss='binary_crossentropy', optimizer=optimizer)
 
     # G
     def build_generator(self):
