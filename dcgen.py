@@ -13,8 +13,6 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
-DEBUG = True
-
 class DCGAN():
     def __init__(self):
         self.img_rows = 96;
@@ -113,8 +111,8 @@ class DCGAN():
 
         return Model(img,validity)
 
-    def train(self,epochs,batch_size=128,save_interval = 1000,d_loop=5,g_loop=1):
-        if (DEBUG):
+    def train(self,epochs,batch_size=128,save_interval = 1000,d_loop=5,g_loop=1,debug=False):
+        if (debug):
             print("调试模式，调整参数")
             batch_size = 3
             save_interval=1
@@ -194,7 +192,7 @@ class DCGAN():
         cnt = 0   #生成的25张图 显示出来
         for i in range(r):
             for j in range(c):
-                axs[i,j].imshow(gen_imgs[cnt, :,:,:])
+                axs[i,j].imshow(gen_imgs[cnt, :,:,:].astype(np.uint8))
                 axs[i,j].axis('off')
                 cnt += 1
         fig.savefig("data/gen/avatar_%d.png" % epoch)
@@ -206,8 +204,9 @@ class DCGAN():
 
 if __name__ == '__main__':
     import sys
+    DEBUG = False
     if (sys.argv==2):
         print("调试模式")
         DEBUG = True
     dcgan = DCGAN()
-    dcgan.train(epochs=40000, batch_size=64, save_interval=800)
+    dcgan.train(epochs=40000, batch_size=64, save_interval=800,debug=DEBUG)
