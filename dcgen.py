@@ -11,8 +11,9 @@ from keras.models import load_model
 from keras.preprocessing import image
 import os
 import matplotlib.pyplot as plt
-import sys
 import numpy as np
+
+debug = True
 
 class DCGAN():
     def __init__(self):
@@ -22,7 +23,7 @@ class DCGAN():
         self.img_shape=(self.img_rows,self.img_cols,self.channels)
         self.latent_dim =100
 
-        optimizer = Adam(0.0002,0.5)
+        optimizer = Adam()#0.0002,0.5) <---- 用默认值来
         optimizerD =RMSprop(lr=0.0008, clipvalue=1.0, decay=6e-8)
         optimizerG = RMSprop(lr=0.0004, clipvalue=1.0, decay=6e-8)
         print("-1")
@@ -44,24 +45,30 @@ class DCGAN():
         # 从生成器中生成的图 经过判别器获得一个valid
         valid = self.discriminator(img)
         self.combined = Model(z,valid)
-        self.combined.compile(loss='binary_crossentropy', optimizer=optimizer)
+        self.combined.compile(loss='binary_crossentropy', optimizer=optiizer)
 
+    # G
     def build_generator(self):
         model = Sequential()
+
         model.add(Dense(512*6*6,activation='relu',input_dim=self.latent_dim))  #输入维度为100，输出128*7*7
         model.add(Reshape((6,6,512)))
+
         model.add(UpSampling2D())  #进行上采样，变成14*14*128
         model.add(Conv2D(256,kernel_size=5,padding='same'))
         model.add(BatchNormalization(momentum=0.8))#该层在每个batch上将前一层的激活值重新规范化，即使得其输出数据的均值接近0，其标准差接近1优点（1）加速收敛 （2）控制过拟合，可以少用或不用Dropout和正则 （3）降低网络对初始化权重不敏感 （4）允许使用较大的学习率
         model.add(Activation("relu"))#
+
         model.add(UpSampling2D())
         model.add(Conv2D(128, kernel_size=5, padding="same"))
         model.add(BatchNormalization(momentum=0.8))
         model.add(Activation("relu"))
+
         model.add(UpSampling2D())
         model.add(Conv2D(64, kernel_size=5, padding="same"))
         model.add(BatchNormalization(momentum=0.8))
         model.add(Activation("relu"))
+
         model.add(UpSampling2D())
         model.add(Conv2D(self.channels, kernel_size=5, padding="same"))
         model.add(Activation("tanh"))
@@ -74,39 +81,28 @@ class DCGAN():
 
     def build_discriminator(self):
         dropout = 0.25
-        depth = 32
         model = Sequential()
-        # model.add(Conv2D(depth,kernel_size=3,strides=2,input_shape=self.img_shape, padding="same"))
-        # model.add(LeakyReLU(alpha=0.2)) #alpha：大于0的浮点数，代表激活函数图像中第三象限线段的斜率
-        # model.add(Dropout(dropout))
-        # model.add(Conv2D(depth*2, kernel_size=3, strides=2, padding="same"))
-        # model.add(LeakyReLU(alpha=0.2))
-        # model.add(Dropout(dropout))
-        # model.add(Conv2D(depth * 4, kernel_size=3, strides=2,  padding="same"))
-        # model.add(LeakyReLU(alpha=0.2))
-        # model.add(Dropout(dropout))
-        # model.add(Conv2D(depth * 8, kernel_size=3, strides=1, padding="same"))
-        # model.add(LeakyReLU(alpha=0.2))
-        # model.add(Dropout(dropout))
-        # model.add(Flatten())
-        # model.add(Dense(1,activation='sigmoid'))
 
         model.add(Conv2D(64, kernel_size=5, strides=2, input_shape=self.img_shape, padding="same"))
         model.add(LeakyReLU(alpha=0.2))
-        model.add(Dropout(0.25))
+        model.add(Dropout(dropout))
+
         model.add(Conv2D(128, kernel_size=5, strides=2, padding="same"))
         model.add(ZeroPadding2D(padding=((0, 1), (0, 1))))
         model.add(BatchNormalization(momentum=0.8))
         model.add(LeakyReLU(alpha=0.2))
-        model.add(Dropout(0.25))
+        model.add(Dropout(dropout))
+
         model.add(Conv2D(256, kernel_size=5, strides=2, padding="same"))
         model.add(BatchNormalization(momentum=0.8))
         model.add(LeakyReLU(alpha=0.2))
-        model.add(Dropout(0.25))
+        model.add(Dropout(dropout))
+
         model.add(Conv2D(512, kernel_size=5, strides=1, padding="same"))
         model.add(BatchNormalization(momentum=0.8))
         model.add(LeakyReLU(alpha=0.2))
-        model.add(Dropout(0.25))
+        model.add(Dropout(dropout))
+
         model.add(Flatten())
         model.add(Dense(1, activation='sigmoid'))
 
@@ -117,8 +113,12 @@ class DCGAN():
 
         return Model(img,validity)
 
-    def train(self,epochs,batch_size=128,save_interval = 50):
-
+    def train(self,epochs,batch_size=128,save_interval = 1000,d_loop=5,g_loop=1):
+        if (DEBUG):
+            print("调试模式，调整参数")
+            batch_size = 3
+            save_interval=1
+            d_loop=1
         # Adversarial ground truths
         valid = np.ones((batch_size, 1))
         fake = np.zeros((batch_size, 1))
@@ -127,21 +127,19 @@ class DCGAN():
             # ---------------------
             #  Train Discriminator
             # ---------------------
+            d_loss_sum = 0
+            for i in range(d_loop):
+                # 未来可以尝试一下，按照论文里说的，判别器多训练几次，比如10次。
+                imgs = self.load_batch_imgs(batch_size,'data/faces')
+                d_loss_real = self.discriminator.train_on_batch(imgs, valid)
 
-            # Select a random half of images
-            # idx = np.random.randint(0, X_train.shape[0], batch_size)
-            # imgs = X_train[idx]
-            imgs = self.load_batch_imgs(batch_size,'data/faces')
+                noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
+                gen_imgs = self.generator.predict(noise)
+                d_loss_fake = self.discriminator.train_on_batch(gen_imgs, fake)
 
-            # Sample noise and generate a batch of new images
-            noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
-            gen_imgs = self.generator.predict(noise)
+                d_loss_sum += 0.5 * np.add(d_loss_real, d_loss_fake)
 
-            # 未来可以尝试一下，按照论文里说的，判别器多训练几次，比如10次。
-            # Train the discriminator (real classified as ones and generated as zeros)
-            d_loss_real = self.discriminator.train_on_batch(imgs, valid)
-            d_loss_fake = self.discriminator.train_on_batch(gen_imgs, fake)
-            d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
+            d_loss = d_loss_sum / d_loop
 
             # ---------------------
             #  Train Generator
@@ -187,7 +185,10 @@ class DCGAN():
         gen_imgs = self.generator.predict(noise)
 
         # Rescale images 0 - 1
-        gen_imgs = 0.5 * gen_imgs + 0.5
+        #gen_imgs = 0.5 * gen_imgs + 0.5
+        print(gen_imgs)
+        gen_imgs = (gen_imgs + 1)*127.5
+        print(gen_imgs)
 
         fig, axs = plt.subplots(r, c)
         cnt = 0   #生成的25张图 显示出来
@@ -204,5 +205,9 @@ class DCGAN():
         self.discriminator = load_model('./model/discriminator_model_last.h5')
 
 if __name__ == '__main__':
+    import sys
+    if (sys.argv==2):
+        print("调试模式")
+        DEBUG = True
     dcgan = DCGAN()
     dcgan.train(epochs=40000, batch_size=64, save_interval=800)
